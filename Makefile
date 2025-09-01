@@ -430,6 +430,10 @@ hack-uninstall-cert-manager: install-helm
 hack-ngrok:
 	ngrok http --hostname=$(KARGO_EXTERNAL_WEBHOOKS_SERVER_HOSTNAME) 30083
 
+.PHONY: hack-troubleshoot-actions
+hack-troubleshoot-actions:
+	./hack/troubleshoot-actions.sh
+
 .PHONY: start-api-local
 start-api-local:
 	./hack/start-api.sh
