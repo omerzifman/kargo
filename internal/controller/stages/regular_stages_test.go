@@ -452,6 +452,36 @@ func TestRegularStageReconciler_Reconcile_CustomInterval(t *testing.T) {
 		WithScheme(scheme).
 		WithObjects(stage).
 		WithStatusSubresource(&kargoapi.Stage{}).
+		WithIndex(
+			&kargoapi.Promotion{},
+			indexer.PromotionsByStageField,
+			indexer.PromotionsByStage,
+		).
+		WithIndex(
+			&kargoapi.Freight{},
+			indexer.FreightByWarehouseField,
+			indexer.FreightByWarehouse,
+		).
+		WithIndex(
+			&kargoapi.Freight{},
+			indexer.FreightByCurrentStagesField,
+			indexer.FreightByCurrentStages,
+		).
+		WithIndex(
+			&kargoapi.Freight{},
+			indexer.FreightByVerifiedStagesField,
+			indexer.FreightByVerifiedStages,
+		).
+		WithIndex(
+			&kargoapi.Freight{},
+			indexer.FreightApprovedForStagesField,
+			indexer.FreightApprovedForStages,
+		).
+		WithIndex(
+			&kargoapi.Promotion{},
+			indexer.PromotionsByStageAndFreightField,
+			indexer.PromotionsByStageAndFreight,
+		).
 		Build()
 
 	r := &RegularStageReconciler{
