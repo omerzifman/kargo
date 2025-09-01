@@ -57,6 +57,10 @@ type ReconcilerConfig struct {
 	RolloutsControllerInstanceID       string `envconfig:"ROLLOUTS_CONTROLLER_INSTANCE_ID"`
 	MaxConcurrentControlFlowReconciles int    `envconfig:"MAX_CONCURRENT_CONTROL_FLOW_RECONCILES" default:"4"`
 	MaxConcurrentReconciles            int    `envconfig:"MAX_CONCURRENT_STAGE_RECONCILES" default:"4"`
+	// ReconciliationInterval specifies how long to wait before requeuing a
+	// Stage reconciliation when no immediate requeue is required.
+	// If unset or zero, a default of 5m is used.
+	ReconciliationInterval time.Duration `envconfig:"STAGE_RECONCILIATION_INTERVAL"`
 }
 
 // Name returns the name of the Stage controller.
@@ -383,8 +387,7 @@ func (r *RegularStageReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{RequeueAfter: 100 * time.Millisecond}, nil
 	}
 	// Otherwise, requeue after a delay.
-	// TODO: Make the requeue delay configurable.
-	return ctrl.Result{RequeueAfter: 5 * time.Minute}, nil
+	return controller.ResultWithRequeue(r.cfg.ReconciliationInterval, 5*time.Minute), nil
 }
 
 func (r *RegularStageReconciler) reconcile(

@@ -3,11 +3,13 @@ package clusterconfigs
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	kargoapi "github.com/akuity/kargo/api/v1alpha1"
@@ -20,6 +22,20 @@ func TestNewReconciler(t *testing.T) {
 	r := newReconciler(fake.NewClientBuilder().Build(), testCfg)
 	require.Equal(t, testCfg, r.cfg)
 	require.NotNil(t, r.client)
+}
+
+func TestReconciler_Reconcile_CustomInterval(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, kargoapi.AddToScheme(scheme))
+
+	c := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(&kargoapi.ClusterConfig{ObjectMeta: metav1.ObjectMeta{Name: "cluster"}}).
+		WithStatusSubresource(&kargoapi.ClusterConfig{}).Build()
+
+	r := &reconciler{cfg: ReconcilerConfig{ReconciliationInterval: 1 * time.Minute}, client: c}
+	res, err := r.Reconcile(context.Background(), ctrl.Request{})
+	require.NoError(t, err)
+	require.Equal(t, 1*time.Minute, res.RequeueAfter)
 }
 
 func TestReconciler_syncWebhookReceivers(t *testing.T) {

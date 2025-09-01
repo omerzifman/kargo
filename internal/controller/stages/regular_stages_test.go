@@ -430,6 +430,43 @@ func TestRegularStageReconciler_Reconcile(t *testing.T) {
 	}
 }
 
+func TestRegularStageReconciler_Reconcile_CustomInterval(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, kargoapi.AddToScheme(scheme))
+
+	req := ctrl.Request{NamespacedName: types.NamespacedName{Namespace: "default", Name: "test-stage"}}
+	stage := &kargoapi.Stage{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:  "default",
+			Name:       "test-stage",
+			Finalizers: []string{kargoapi.FinalizerName},
+		},
+		Spec: kargoapi.StageSpec{
+			PromotionTemplate: &kargoapi.PromotionTemplate{
+				Spec: kargoapi.PromotionTemplateSpec{Steps: []kargoapi.PromotionStep{{}, {}}},
+			},
+		},
+	}
+
+	c := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(stage).
+		WithStatusSubresource(&kargoapi.Stage{}).
+		Build()
+
+	r := &RegularStageReconciler{
+		client:      c,
+		eventSender: k8sevent.NewEventSender(fakeevent.NewEventRecorder(10)),
+		cfg: ReconcilerConfig{
+			ReconciliationInterval: 30 * time.Second,
+		},
+	}
+
+	result, err := r.Reconcile(context.Background(), req)
+	require.NoError(t, err)
+	assert.Equal(t, 30*time.Second, result.RequeueAfter)
+}
+
 func TestRegularStagesReconciler_reconcile(t *testing.T) {
 	scheme := runtime.NewScheme()
 	require.NoError(t, kargoapi.AddToScheme(scheme))

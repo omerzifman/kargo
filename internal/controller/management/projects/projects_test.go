@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -239,6 +240,24 @@ func TestReconciler_Reconcile(t *testing.T) {
 			testCase.assertions(t, res, err)
 		})
 	}
+}
+
+func TestReconciler_Reconcile_CustomInterval(t *testing.T) {
+	r := &reconciler{
+		cfg: ReconcilerConfig{ReconciliationInterval: 42 * time.Second},
+		getProjectFn: func(context.Context, client.Client, string) (*kargoapi.Project, error) {
+			return &kargoapi.Project{}, nil
+		},
+		ensureFinalizerFn: func(context.Context, client.Client, client.Object) (bool, error) { return false, nil },
+		reconcileFn: func(context.Context, *kargoapi.Project) (kargoapi.ProjectStatus, error) {
+			return kargoapi.ProjectStatus{}, nil
+		},
+		patchProjectStatusFn: func(context.Context, *kargoapi.Project, kargoapi.ProjectStatus) error { return nil },
+	}
+
+	res, err := r.Reconcile(context.Background(), ctrl.Request{})
+	require.NoError(t, err)
+	require.Equal(t, 42*time.Second, res.RequeueAfter)
 }
 
 func TestReconciler_reconcile(t *testing.T) {

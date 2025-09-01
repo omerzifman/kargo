@@ -475,6 +475,8 @@ controller:
     stages:
       ## @param controller.reconcilers.stages.maxConcurrentReconciles optionally overrides the maximum number of (non-control flow) Stage resources the controller can reconcile concurrently.
       maxConcurrentReconciles:
+      ## @param controller.reconcilers.stages.reconciliationInterval optionally sets the default requeue interval for (non-control flow) Stage reconciliations when no immediate requeue is requested. Accepts Go duration format (e.g., "5m", "30s"). If unset or empty, defaults to "5m".
+      reconciliationInterval: "5m"
     warehouses:
       ## @param controller.reconcilers.warehouses.maxConcurrentReconciles optionally overrides the maximum number of Warehouse resources the controller can reconcile concurrently.
       maxConcurrentReconciles:
@@ -766,9 +768,16 @@ managementController:
     projectConfigs:
       ## @param managementController.reconcilers.projectConfigs.maxConcurrentReconciles optionally overrides the maximum number of ProjectConfig resources the management controller can reconcile concurrently.
       maxConcurrentReconciles:
+      ## @param managementController.reconcilers.projectConfigs.reconciliationInterval optionally sets the default requeue interval for ProjectConfig reconciliations when no immediate requeue is requested. Accepts Go duration format (e.g., "5m", "30s"). If unset or empty, defaults to "5m".
+      reconciliationInterval: "5m"
     projects:
       ## @param managementController.reconcilers.projects.maxConcurrentReconciles optionally overrides the maximum number of Project resources the management controller can reconcile concurrently.
       maxConcurrentReconciles:
+      ## @param managementController.reconcilers.projects.reconciliationInterval optionally sets the default requeue interval for Project reconciliations when no immediate requeue is requested. Accepts Go duration format (e.g., "5m", "30s"). If unset or empty, defaults to "5m".
+      reconciliationInterval: "5m"
+    clusterConfigs:
+      ## @param managementController.reconcilers.clusterConfigs.reconciliationInterval optionally sets the default requeue interval for ClusterConfig reconciliations when no immediate requeue is requested. Accepts Go duration format (e.g., "5m", "30s"). If unset or empty, defaults to "5m".
+      reconciliationInterval: "5m"
     serviceAccounts:
       ## @param managementController.reconcilers.serviceAccounts.maxConcurrentReconciles optionally overrides the maximum number of ServiceAccount resources the management controller can reconcile concurrently.
       maxConcurrentReconciles:

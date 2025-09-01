@@ -25,8 +25,9 @@ import (
 )
 
 type ReconcilerConfig struct {
-	ExternalWebhookServerBaseURL string `envconfig:"EXTERNAL_WEBHOOK_SERVER_BASE_URL" required:"true"`
-	MaxConcurrentReconciles      int    `envconfig:"MAX_CONCURRENT_PROJECT_CONFIG_RECONCILES" default:"4"`
+	ExternalWebhookServerBaseURL string        `envconfig:"EXTERNAL_WEBHOOK_SERVER_BASE_URL" required:"true"`
+	MaxConcurrentReconciles      int           `envconfig:"MAX_CONCURRENT_PROJECT_CONFIG_RECONCILES" default:"4"`
+	ReconciliationInterval       time.Duration `envconfig:"PROJECT_CONFIG_RECONCILIATION_INTERVAL"`
 }
 
 func ReconcilerConfigFromEnv() ReconcilerConfig {
@@ -136,8 +137,8 @@ func (r *reconciler) Reconcile(
 		return ctrl.Result{}, reconcileErr
 	}
 
-	// TODO: Make the requeue delay configurable.
-	return ctrl.Result{RequeueAfter: 5 * time.Minute}, nil
+	// Requeue after a delay using configured interval or 5m default.
+	return controller.ResultWithRequeue(r.cfg.ReconciliationInterval, 5*time.Minute), nil
 }
 
 func (r *reconciler) reconcile(
