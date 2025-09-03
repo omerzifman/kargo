@@ -213,7 +213,7 @@ jobs:
         BASE_IMAGE=localhost:5000/kargo-base make build-base-image
         docker push localhost:5000/kargo-base:latest-arm64
         docker push localhost:5000/kargo-base:latest-amd64
-    - name: Build final image (export OCI tar)
+    - name: Build final image (export Docker archive)
       uses: docker/build-push-action@5176d81f87c23d6fc96624dfdbcd9f3830bbe445 # v6.5.0
       with:
         platforms: linux/amd64,linux/arm64
@@ -223,14 +223,17 @@ jobs:
         push: false
         cache-from: type=gha
         cache-to: type=gha,mode=max
-        outputs: type=oci,dest=./kargo-image-oci.tar
+        outputs: type=docker,dest=./kargo-image-docker.tar
+
     - name: Compress tar
-      run: gzip -9 ./kargo-image-oci.tar
+      run: gzip -9 ./kargo-image-docker.tar
+
     - name: Upload image artifact
       uses: actions/upload-artifact@v4
       with:
-        name: kargo-image-oci
-        path: kargo-image-oci.tar.gz
+        name: kargo-image-docker
+        path: kargo-image-docker.tar.gz
+
       
   build-cli:
     needs: [test-unit, lint-go, lint-charts, lint-proto, lint-and-typecheck-ui, check-codegen]
