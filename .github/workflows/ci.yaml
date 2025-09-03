@@ -222,6 +222,7 @@ jobs:
         push: false
         cache-from: type=gha
         cache-to: type=gha,mode=max
+        outputs: type=docker,dest=./image.tar
 
   build-cli:
     needs: [test-unit, lint-go, lint-charts, lint-proto, lint-and-typecheck-ui, check-codegen]
