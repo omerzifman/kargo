@@ -43,16 +43,23 @@ git push origin main --force
 
 ## What Gets Removed
 
-The workflow_dispatch trigger line will be removed from `.github/workflows/ci.yaml`:
+The workflow_dispatch trigger line will be removed from `.github/workflows/ci.yaml`.
 
+**Before (on main):**
 ```yaml
-name: CI
-
 on:
--  workflow_dispatch:
-   pull_request:
-     branches-ignore:
-     - newdocs
+  workflow_dispatch:
+  pull_request:
+    branches-ignore:
+    - newdocs
+```
+
+**After (this PR):**
+```yaml
+on:
+  pull_request:
+    branches-ignore:
+    - newdocs
 ```
 
 ## Important Notes
