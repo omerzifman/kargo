@@ -1,18 +1,22 @@
+import { useDraggable } from '@dnd-kit/core';
 import { faDocker, faGithub } from '@fortawesome/free-brands-svg-icons';
 import {
   faAnchor,
-  faArrowsLeftRightToLine,
   faCheck,
   faEllipsis,
+  faPlus,
+  faGripVertical,
+  faHourglass,
   faTrash,
+  faTriangleExclamation,
   faWarehouse,
   IconDefinition
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { Button, Divider, Dropdown, Flex, Progress, Typography } from 'antd';
+import { Button, Divider, Dropdown, Flex, Tooltip, Typography } from 'antd';
 import classNames from 'classnames';
 import { Duration, formatDistance, formatDuration } from 'date-fns';
-import { ReactNode, useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { generatePath, useNavigate } from 'react-router-dom';
 
 import { paths } from '@ui/config/paths';
@@ -23,9 +27,11 @@ import { ColorMap } from '@ui/features/stage/utils';
 import { Freight, Stage } from '@ui/gen/api/v1alpha1/generated_pb';
 import { timestampDate } from '@ui/utils/connectrpc-utils';
 
+import { useManualApprovalModal } from '../promotion/use-manual-approval-modal';
+
 import { DeleteFreightModal } from './delete-freight-modal';
 import { FreightArtifact } from './freight-artifact';
-import { useSoakTimeCounter, useSoakTimePercentage } from './use-soak-time-counter';
+import { useSoakTimeCounter } from './use-soak-time-counter';
 
 type FreightCardProps = {
   freight: Freight;
@@ -38,11 +44,9 @@ type FreightCardProps = {
   className?: string;
   promote?: boolean;
   onReviewAndPromote?(): void;
-  onExpand(): void;
   soakTime?: Duration;
-
-  // count of stacked freights
-  count?: number;
+  promotionEligible?: boolean;
+  isPromotionEligibleLoading?: boolean;
 };
 
 export const FreightCard = (props: FreightCardProps) => {
@@ -87,27 +91,105 @@ export const FreightCard = (props: FreightCardProps) => {
     }
   }, [props.soakTime]);
 
-  const soakTimePercentage = useSoakTimePercentage(frozenInitialSoakTime.current, soakTime);
-
   const soakTimeFormatted = useMemo(() => (soakTime ? formatDuration(soakTime) : ''), [soakTime]);
 
-  let CardContent: ReactNode;
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+    id: props.freight.metadata?.name || 'name',
+    data: { originName: props.freight.origin?.name }
+  });
 
-  if (props.count) {
-    CardContent = (
-      <div className='flex flex-col items-center justify-center h-full px-2 bg-gray-200'>
-        <Typography.Text type='secondary' className='text-xs'>
-          <FontAwesomeIcon icon={faArrowsLeftRightToLine} />
-          <br />
-          {props.count}x
-          <br />
-          freights
-        </Typography.Text>
+  const showManualApproveModal = useManualApprovalModal();
+
+  const style = transform
+    ? {
+        transform: `translate3d(${transform.x}px, ${transform.y}px, 0) scale(1.05)`,
+        zIndex: 9999,
+        boxShadow: '0 4px 8px rgba(0,0,0,.1)'
+      }
+    : undefined;
+
+  return (
+    <div ref={setNodeRef} style={style} className='relative'>
+      <div className='absolute bottom-0 left-0 right-0 p-1'>
+        {props.promote ? (
+          <Tooltip
+            title={
+              !props.promotionEligible && !props.isPromotionEligibleLoading
+                ? soakTimeFormatted
+                  ? `Soak: ${soakTimeFormatted}`
+                  : 'Non-approved freight'
+                : ''
+            }
+          >
+            <Button
+              className={classNames('w-full', { 'opacity-70': !props.promotionEligible })}
+              type='primary'
+              size='small'
+              onClick={() => {
+                const freight = props.freight?.metadata?.name || '';
+                const stage = actionContext?.action?.stage?.metadata?.name || '';
+                const projectName = props.freight?.metadata?.namespace || '';
+
+                if (props.promotionEligible) {
+                  props.onReviewAndPromote?.();
+                  return;
+                }
+
+                showManualApproveModal({
+                  freight,
+                  stage,
+                  projectName,
+                  onApprove: () => {
+                    navigate(
+                      generatePath(paths.promote, {
+                        name: projectName,
+                        freight: freight,
+                        stage
+                      })
+                    );
+                  }
+                });
+              }}
+              loading={props.isPromotionEligibleLoading}
+              icon={
+                !props.promotionEligible && !props.isPromotionEligibleLoading ? (
+                  <FontAwesomeIcon icon={soakTimeFormatted ? faHourglass : faTriangleExclamation} />
+                ) : undefined
+              }
+            >
+              Select
+            </Button>
+          </Tooltip>
+        ) : (
+          <div
+            {...listeners}
+            {...attributes}
+            className='bg-gray-100 rounded text-center cursor-pointer hover:bg-gray-200 active:bg-gray-200'
+            style={{ padding: '3px 0 1px' }}
+            onMouseEnter={(e) => e.stopPropagation()}
+          >
+            <FontAwesomeIcon icon={faGripVertical} className='text-gray-500' size='sm' />
+          </div>
+        )}
       </div>
-    );
-  } else {
-    CardContent = (
-      <>
+      <div
+        className={classNames(
+          'rounded-md text-center flex flex-col cursor-pointer pb-7 border border-solid border-gray-100 hover:border-gray-300',
+          {
+            'bg-gray-50': !isViewingFreight,
+            'bg-gray-100': isViewingFreight
+          },
+          props.className
+        )}
+        onClick={() =>
+          navigate(
+            generatePath(paths.freight, {
+              name: props.freight?.metadata?.namespace,
+              freightName: props.freight?.metadata?.name
+            })
+          )
+        }
+      >
         <div
           className={classNames('relative px-2', {
             'pl-4': props.inUse
@@ -121,6 +203,21 @@ export const FreightCard = (props: FreightCardProps) => {
             <Dropdown
               menu={{
                 items: [
+                  {
+                    key: 'similar-freight',
+                    label: 'Clone freight',
+                    icon: <FontAwesomeIcon icon={faPlus} />,
+                    onClick: (e) => {
+                      e.domEvent.stopPropagation();
+                      navigate(
+                        `${generatePath(paths.warehouse, {
+                          name: props.freight?.metadata?.namespace,
+                          warehouseName: props.freight?.origin?.name,
+                          tab: 'create-freight'
+                        })}?clone-freight=${props.freight?.alias}`
+                      );
+                    }
+                  },
                   {
                     key: 'manually-approve',
                     label: 'Manually Approve',
@@ -228,66 +325,7 @@ export const FreightCard = (props: FreightCardProps) => {
             </Typography.Text>
           </div>
         </div>
-
-        {soakTimeFormatted && !props.promote && (
-          <div className='px-1 pb-1'>
-            <Button
-              disabled
-              onClick={(e) => e.stopPropagation()}
-              size='small'
-              className='text-[10px] text-center w-[230px] flex font-semibold'
-            >
-              <span className='mr-auto'>Soak: {soakTimeFormatted}</span>
-              <Progress strokeWidth={12} type='circle' size={14} percent={soakTimePercentage} />
-            </Button>
-          </div>
-        )}
-
-        {props.promote && (
-          <div className='px-1 pb-1'>
-            <Button
-              className='w-full'
-              type='primary'
-              size='small'
-              onClick={(e) => {
-                e.stopPropagation();
-                props.onReviewAndPromote?.();
-              }}
-            >
-              Select
-            </Button>
-          </div>
-        )}
-      </>
-    );
-  }
-
-  return (
-    <div
-      className={classNames(
-        'rounded-md text-center flex flex-col cursor-pointer hover:bg-gray-100',
-        {
-          'bg-gray-50': !isViewingFreight,
-          'bg-gray-100': isViewingFreight
-        },
-        props.className
-      )}
-      style={{ border: '1px solid rgba(0,0,0,.05)' }}
-      onClick={() => {
-        if (props.count) {
-          props.onExpand();
-          return;
-        }
-
-        navigate(
-          generatePath(paths.freight, {
-            name: props.freight?.metadata?.namespace,
-            freightName: props.freight?.metadata?.name
-          })
-        );
-      }}
-    >
-      {CardContent}
+      </div>
     </div>
   );
 };

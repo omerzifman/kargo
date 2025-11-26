@@ -19,6 +19,33 @@ reconciliation by the Kargo controller, which will execute the discovery of
 new artifacts from all repositories to which that `Warehouse` subscribes.
 :::
 
+## Self-Hosted Artifactory
+
+:::info
+If you are not using a self-hosted Artifactory instance, skip to
+[the configuring the receiver](#configuring-the-receiver) section.
+:::
+
+In order for a webhook initiated `Warehouse` refresh to successfully occur,
+it is required that you set a <Hlt>Custom Base URL</Hlt> for your instance. 
+When this setting hasn't been configured, critical information will be missing 
+from the webhook payloads.
+
+1. Navigate to 
+`https://<base-url>/ui/admin/configuration/general`, where `<base-url>` has been replaced with the base URL of your self-hosted Artifactory instance.
+
+1.  Set the <Hlt>Custom Base URL</Hlt> field to the base URL of your self-hosted
+    Artifactory instance.
+
+    ![Custom Base URL](./img/custom_base_url.png "Custom Base URL")
+
+1. At the bottom of the form, click <Hlt>Save</Hlt>.
+
+:::info
+For additional information on configuring your <Hlt>Custom Base URL</Hlt>
+refer directly to the [Artifactory Docs](https://jfrog.com/help/r/jfrog-platform-administration-documentation/general-settings).
+:::
+
 ## Configuring the Receiver
 
 An Artifactory webhook receiver must reference a Kubernetes `Secret` resource 
@@ -59,6 +86,57 @@ spec:
     artifactory:
       secretRef:
         name: artifactory-wh-secret
+```
+
+### Virtual Repositories
+
+When Warehouses intended to be refreshed by an Artifactory webhook receiver
+subscribe to Artifactory
+[virtual repositories](https://jfrog.com/help/r/jfrog-artifactory-documentation/virtual-repositories) there will be discrepancies between the URLs the receiver will
+infer for the
+[local repositories](https://jfrog.com/help/r/jfrog-artifactory-documentation/local-repositories) from which push events have originated and the URLs actually used
+by those Warehouses' subscriptions.
+
+To compensate for this, a value can be provided for the Artifactory webhook
+receiver configuration's `virtualRepoName` field. When specified, its value
+supersedes the local repository name found in the webhook's payload, which
+allows the receiver to infer the correct virtual repository URL for which all
+subscribed Warehouses should be refreshed.
+
+In practice, when using virtual repositories, a separate Artifactory webhook
+receiver should be configured _for each_, but one such receiver can handle
+events originating from _any number_ of local repositories that are aggregated by
+that virtual repository. For example, if a virtual repository `proj-virtual`
+aggregates container images from all of the `proj` Artifactory project's local
+image repositories, with a single webhook configured to post to the following
+receiver, an image pushed to
+`example.frog.io/proj-<local-repo-name>/<path>/image`, will correctly cause that
+receiver to refresh all Warehouses subscribed to
+`example.frog.io/proj-virtual/<path>/image`.
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: artifactory-wh-secret
+  namespace: kargo-demo
+  labels:
+    kargo.akuity.io/cred-type: generic
+data:
+  secret-token: <base64-encoded secret token>
+---
+apiVersion: kargo.akuity.io/v1alpha1
+kind: ProjectConfig
+metadata:
+  name: kargo-demo
+  namespace: kargo-demo
+spec:
+  webhookReceivers: 
+  - name: proj-virtual-wh-receiver
+    artifactory:
+      secretRef:
+        name: artifactory-wh-secret
+      virtualRepoName: proj-virtual
 ```
 
 ## Retrieving the Receiver's URL

@@ -11,13 +11,43 @@ type ArgoCDUpdateConfig struct {
 }
 
 type ArgoCDAppUpdate struct {
-	// Specifies the name of an Argo CD Application resource to be updated.
-	Name string `json:"name"`
+	// Specifies the exact name of an Argo CD Application resource to be updated. Mutually
+	// exclusive with 'selector'.
+	Name string `json:"name,omitempty"`
 	// Specifies the namespace of an Argo CD Application resource to be updated. If left
 	// unspecified, the namespace will be the controller's configured default.
 	Namespace string `json:"namespace,omitempty"`
+	// Specifies a label selector to match Argo CD Application resources to be updated. Mutually
+	// exclusive with 'name'.
+	Selector *ArgoCDAppSelector `json:"selector,omitempty"`
 	// Describes updates to be applied to various sources of an Argo CD Application resource.
 	Sources []ArgoCDAppSourceUpdate `json:"sources,omitempty"`
+}
+
+// Specifies a label selector to match Argo CD Application resources to be updated. Mutually
+// exclusive with 'name'.
+//
+// Selector to match Argo CD Application resources by labels. Must contain at least one
+// selection criterion.
+type ArgoCDAppSelector struct {
+	// matchExpressions is a list of label selector requirements. The requirements are ANDed.
+	MatchExpressions []MatchExpression `json:"matchExpressions,omitempty"`
+	// matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is
+	// equivalent to an element of matchExpressions, whose key field is 'key', the operator is
+	// 'In', and the values array contains only 'value'. The requirements are ANDed.
+	MatchLabels map[string]string `json:"matchLabels,omitempty"`
+}
+
+type MatchExpression struct {
+	// key is the label key that the selector applies to.
+	Key string `json:"key"`
+	// operator represents a key's relationship to a set of values. Valid operators are In,
+	// NotIn, Exists and DoesNotExist.
+	Operator Operator `json:"operator"`
+	// values is an array of string values. If the operator is In or NotIn, the values array
+	// must be non-empty. If the operator is Exists or DoesNotExist, the values array must be
+	// empty. This array is replaced during a strategic merge patch.
+	Values []string `json:"values,omitempty"`
 }
 
 type ArgoCDAppSourceUpdate struct {
@@ -173,6 +203,23 @@ type GitCommitConfigAuthor struct {
 	SigningKey string `json:"signingKey,omitempty"`
 }
 
+type GitMergePRConfig struct {
+	// Skip TLS verification when interacting with the Git provider. Default is false.
+	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty"`
+	// The number of the pull request to merge.
+	PRNumber int64 `json:"prNumber"`
+	// The name of the Git provider to use. Currently 'azure', 'bitbucket', 'gitea', 'github',
+	// and 'gitlab' are supported. Kargo will try to infer the provider if it is not explicitly
+	// specified.
+	Provider *Provider `json:"provider,omitempty"`
+	// The URL of the remote Git repository containing the pull request.
+	RepoURL string `json:"repoURL"`
+	// If true, the step will return RUNNING instead of FAILED when the PR is not yet mergeable.
+	// The merge will be retried on the next reconciliation until it succeeds or times out.
+	// Default is false.
+	Wait bool `json:"wait,omitempty"`
+}
+
 type GitOpenPRConfig struct {
 	// Indicates whether a new, empty orphan branch should be created and pushed to the remote
 	// if the target branch does not already exist there. Default is false.
@@ -202,6 +249,11 @@ type GitOpenPRConfig struct {
 }
 
 type GitPushConfig struct {
+	// Whether to force push to the target branch, overwriting any existing history. This is
+	// useful for scenarios where you want to completely replace the branch content (e.g.,
+	// pushing rendered manifests that don't depend on previous state). Use with caution as this
+	// will overwrite any commits that exist on the remote branch but not in your local branch.
+	Force bool `json:"force,omitempty"`
 	// Indicates whether to push to a new remote branch. A value of 'true' is mutually exclusive
 	// with 'targetBranch'. If neither of these is provided, the target branch will be the
 	// currently checked out branch.
@@ -438,7 +490,7 @@ type KustomizeSetImageConfig struct {
 	// left unspecified, all images from the Freight collection will be set in the Kustomization
 	// file. Unless there is an ambiguous image name (for example, due to two Warehouses
 	// subscribing to the same repository), which requires manual configuration.
-	Images []Image `json:"images"`
+	Images []Image `json:"images,omitempty"`
 	// Path to the directory containing the Kustomization file.
 	Path string `json:"path"`
 }
@@ -474,6 +526,20 @@ type OCIDownloadConfig struct {
 	OutPath string `json:"outPath"`
 }
 
+type SetMetadataConfig struct {
+	// List of metadata updates to apply to various resources
+	Updates []Update `json:"updates"`
+}
+
+type Update struct {
+	// Kind of resource to update metadata for
+	Kind Kind `json:"kind"`
+	// Name of the resource to update metadata for
+	Name string `json:"name"`
+	// Key/value pairs to set as metadata on the resource
+	Values map[string]interface{} `json:"values"`
+}
+
 type UntarConfig struct {
 	// Ignore is a (multiline) string of glob patterns to ignore when extracting files. It
 	// accepts the same syntax as .gitignore files.
@@ -486,6 +552,15 @@ type UntarConfig struct {
 	// StripComponents is the number of leading components to strip from file names in the
 	// archive.
 	StripComponents *int64 `json:"stripComponents,omitempty"`
+}
+
+type YAMLMergeConfig struct {
+	// allow directive to pass even if an input file does not exist.
+	IgnoreMissingFiles bool `json:"ignoreMissingFiles,omitempty"`
+	// InFiles is the list of paths of YAML files to merge
+	InFiles []string `json:"inFiles"`
+	// OutFile is the path to the merged YAML file to created or updated.
+	OutFile string `json:"outFile"`
 }
 
 type YAMLParseConfig struct {
@@ -516,6 +591,17 @@ type YAMLUpdate struct {
 	Value interface{} `json:"value"`
 }
 
+// operator represents a key's relationship to a set of values. Valid operators are In,
+// NotIn, Exists and DoesNotExist.
+type Operator string
+
+const (
+	DoesNotExist Operator = "DoesNotExist"
+	Exists       Operator = "Exists"
+	In           Operator = "In"
+	NotIn        Operator = "NotIn"
+)
+
 // The name of the Git provider to use. Currently 'azure', 'bitbucket', 'gitea', 'github',
 // and 'gitlab' are supported. Kargo will try to infer the provider if it is not explicitly
 // specified.
@@ -538,4 +624,12 @@ type OutLayout string
 const (
 	Flat OutLayout = "flat"
 	Helm OutLayout = "helm"
+)
+
+// Kind of resource to update metadata for
+type Kind string
+
+const (
+	Freight Kind = "Freight"
+	Stage   Kind = "Stage"
 )

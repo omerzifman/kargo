@@ -371,14 +371,126 @@ relevant `Freight` is not found from the `FreightCollection`.
 :::tip
 You can handle `nil` values gracefully in Expr using its
 [nil coalescing](https://expr-lang.org/docs/language-definition#nil-coalescing) and
-[optional chaining](https://expr-lang.org/docs/language-definition#optional-chaining) features.
+[optional chaining](https://expr-lang.org/docs/language-definition#optional-chaining)
+features.
 :::
 
-### `commitFrom(repoURL, [freightOrigin])`
+### `freightMetadata(freightName)`
 
-The `commitFrom()` function returns a corresponding `GitCommit` object from the
-`Promotion` or `Stage` their `FreightCollection`. It has one required and one
-optional argument:
+The `freightMetadata()` function retrieves the map of all metadata stored in a
+`Freight` resource. It has one required argument:
+
+- `freightName` (Required): The name of the `Freight` resource
+
+Example:
+
+```yaml
+config:
+  # Access metadata values using dot notation
+  category: ${{ freightMetadata(ctx.targetFreight.name).category }}
+
+  # Using nil coalescing (??) to provide default values if metadata is missing
+  settings: ${{ freightMetadata(ctx.targetFreight.name)['settings'] ?? "default-settings" }}
+
+  # Using optional chaining (?.) with nil coalescing for nested values
+  nested: ${{ freightMetadata(ctx.targetFreight.name)?.config?.settings?.timeoutSeconds ?? 300 }}
+```
+
+:::tip
+You can handle `nil` values gracefully in Expr using its
+[nil coalescing](https://expr-lang.org/docs/language-definition#nil-coalescing) and
+[optional chaining](https://expr-lang.org/docs/language-definition#optional-chaining)
+features.
+:::
+
+:::note
+An optional second argument (`freightMetadata(freightName, 'key-name')`) is supported
+but deprecated as of `v1.8` and will be removed in `v1.10`. While the two-argument
+form returns a single value for the specified key, the single-argument form returns
+the complete metadata map. To migrate, use either dot notation
+(`freightMetadata(freightName).keyName`) or map access syntax
+(`freightMetadata(freightName)['key-name']`) to access specific values.
+:::
+
+### `stageMetadata(stageName)`
+
+The `stageMetadata()` function retrieves metadata stored in a `Stage` resource. It
+has one required argument:
+
+- `stageName` (Required): The name of the `Stage` resource
+
+This returns a map containing all metadata key/value pairs stored in the `Stage`
+resource.
+
+Example:
+
+```yaml
+config:
+  # Access metadata values using ['key-name'] syntax
+  region: ${{ stageMetadata(ctx.stage)['aws-region'] }}
+
+  # Using nil coalescing (??) to provide default values if metadata is missing
+  tier: ${{ stageMetadata(ctx.stage)['tier'] ?? "default-tier" }}
+
+  # Using optional chaining (?.) with nil coalescing for nested values
+  nested: ${{ stageMetadata(ctx.stage)?.config?.settings?.timeoutSeconds ?? 300 }}
+```
+
+:::tip
+You can handle `nil` values gracefully in Expr using its
+[nil coalescing](https://expr-lang.org/docs/language-definition#nil-coalescing) and
+[optional chaining](https://expr-lang.org/docs/language-definition#optional-chaining)
+features.
+:::
+
+### `commitFrom()`
+
+The signature and return value of the `commitFrom()` function vary slightly
+with the context in which it's used.
+
+In the context of an optional expression evaluated to determine whether criteria
+have been met for automatic creation of a `Freight` resource following a
+`Warehouse`'s artifact discovery process, the function signature is:
+
+`commitFrom(repoURL)`
+
+It has one required argument:
+
+- `repoURL` (Required): The URL of a Git repository.
+
+The returned `DiscoveredCommit` object has the following fields:
+
+| Field | Description |
+|-------|-------------|
+| `ID`      | The ID of the Git commit. |
+| `Branch`  | Branch is the branch in which the commit was found. This field is optional, and populated based on the CommitSelectionStrategy of the GitSubscription. |
+| `Tag`     | Tag is the tag that resolved to this commit. This field is optional, and populated based on the CommitSelectionStrategy of the GitSubscription. |
+| `Subject` | The first line of the commit message. |
+| `Author` | Author is the author of the commit. |
+| `Committer` | Committer is the person who committed the commit. |
+| `CreatorDate` | The creation date of the commit as specified by the commit. |
+
+Example:
+
+```yaml
+spec:
+  freightCreationPolicy: Automatic
+  subscriptions:
+  - git:
+      repoURL: https://github.com/example/frontend.git
+  - git:
+      repoURL: https://github.com/example/backend.git
+  freightCreationCriteria:
+    expression: |
+      commitFrom('https://github.com/example/frontend.git').Tag == comitFrom('https://github.com/example/backend.git').Tag
+```
+
+In all other contexts, such as promotion and verification processes, the
+function signature is:
+
+`commitFrom(repoURL, [freightOrigin])`
+
+It has one required and one optional argument:
 
 - `repoURL` (Required): The URL of a Git repository.
 - `freightOrigin` (Optional): A `FreightOrigin` object (obtained from
@@ -415,16 +527,20 @@ config:
   commitID: ${{ commitFrom("https://github.com/example/repo.git", warehouse("my-warehouse")).ID }}
 ```
 
-### `imageFrom(repoURL, [freightOrigin])`
+### `imageFrom()`
 
-The `imageFrom()` function returns a corresponding `Image` object from the
-`Promotion` or `Stage` their `FreightCollection`. It has one required and
-one optional argument:
+The signature of the `imageFrom()` function varies slightly with the context in
+which it's used.
 
-- `repoURL` (Required): The URL of a container image repository.
-- `freightOrigin` (Optional): A `FreightOrigin` object (obtained from
-  [`warehouse()`](#warehousename)) to specify which `Warehouse` should provide
-  the image information.
+In the context of an optional expression evaluated to determine whether criteria
+have been met for automatic creation of a `Freight` resource following a
+`Warehouse`'s artifact discovery process, the function signature is:
+
+`imageFrom(repoURL)`
+
+It has one required argument:
+
+- `repoURL` (Required): The URL of an image repository.
 
 The returned `Image` object has the following fields:
 
@@ -435,9 +551,36 @@ The returned `Image` object has the following fields:
 | `Digest` | The digest of the image. |
 | `Annotations` | A map of [annotations](https://specs.opencontainers.org/image-spec/annotations/) discovered for the image. |
 
-The optional `freightOrigin` argument should be used when a `Stage` requests
-`Freight` from multiple origins (`Warehouse`s) and more than one can provide a
-`Image` object from the specified repository.
+Example:
+
+```yaml
+spec:
+  freightCreationPolicy: Automatic
+  subscriptions:
+  - image:
+      repoURL: ghcr.io/example/frontend
+  - image:
+      repoURL: ghcr.io/example/backend
+  freightCreationCriteria:
+    expression: |
+      imageFrom('ghcr.io/example/frontend.git').Tag == imageFrom('ghcr.io/example/backend.git').Tag
+```
+
+:::info
+The returned `Image` object is the same in all contexts.
+:::
+
+In all other contexts, such as promotion and verification processes, the
+function signature is:
+
+`imageFrom(repoURL, [freightOrigin])`
+
+It has one required and one optional argument:
+
+- `repoURL` (Required): The URL of a container image repository.
+- `freightOrigin` (Optional): A `FreightOrigin` object (obtained from
+  [`warehouse()`](#warehousename)) to specify which `Warehouse` should provide
+  the image information.
 
 If an image is not found from the `FreightCollection`, returns `nil`.
 
@@ -453,11 +596,56 @@ config:
   imageTag: ${{ imageFrom("public.ecr.aws/nginx/nginx", warehouse("my-warehouse")).Tag }}
 ```
 
-### `chartFrom(repoURL, [chartName], [freightOrigin])`
+### `chartFrom()`
 
-The `chartFrom()` function returns a corresponding `Chart` object from the
-`Promotion` or `Stage` their `FreightCollection`. It has one required and two
-optional arguments:
+The signature of the `chartFrom()` function varies slightly with the context in
+which it's used.
+
+In the context of an optional expression evaluated to determine whether criteria
+have been met for automatic creation of a `Freight` resource following a
+`Warehouse`'s artifact discovery process, the function signature is:
+
+`chartFrom(repoURL, [chartName])`
+
+It has one required and one optional argument:
+
+- `repoURL` (Required): The URL of a Helm chart repository.
+- `chartName` (Optional): The name of the chart (required for HTTP/S
+  repositories, not needed for OCI registries).
+
+The `chartFrom()` function returns a corresponding `Chart` object.
+
+| Field | Description |
+|-------|-------------|
+| `RepoURL` | The URL of the Helm chart repository the chart originates from. For HTTP/S repositories, this is the URL of the repository. For OCI repositories, this is the URL of the container image repository including the chart's name. |
+| `Name` | The name of the Helm chart. Only present for HTTP/S repositories. |
+| `Version` | The version of the Helm chart. |
+
+Example:
+
+```yaml
+spec:
+  freightCreationPolicy: Automatic
+  subscriptions:
+  - chart:
+      repoURL: oci://example.com/my-chart
+  - chart:
+      repoURL: oci://example.com/my-other-chart
+  freightCreationCriteria:
+    expression: |
+      chartFrom('oci://example.com/my-chart').Version == chartFrom('oci://example.com/my-other-chart').Tag
+```
+
+:::info
+The returned `Chart` object is the same in all contexts.
+:::
+
+In all other contexts, such as promotion and verification processes, the
+function signature is:
+
+`chartFrom(repoURL, [chartName], [freightOrigin])`
+
+It has one required and two optional arguments:
 
 - `repoURL` (Required): The URL of a Helm chart repository.
 - `chartName` (Optional): The name of the chart (required for HTTP/S
@@ -465,14 +653,6 @@ optional arguments:
 - `freightOrigin` (Optional): A `FreightOrigin` object (obtained from
   [`warehouse()`](#warehousename)) to specify which `Warehouse` should provide
   the chart information.
-
-The returned `Chart` object has the following fields:
-
-| Field | Description |
-|-------|-------------|
-| `RepoURL` | The URL of the Helm chart repository the chart originates from. For HTTP/S repositories, this is the URL of the repository. For OCI repositories, this is the URL of the container image repository including the chart's name. |
-| `Name` | The name of the Helm chart. Only present for HTTP/S repositories. |
-| `Version` | The version of the Helm chart. |
 
 For Helm charts stored in OCI registries, the URL should be the full path to
 the repository within that registry.
@@ -558,6 +738,56 @@ Examples:
 ```yaml
 config:
   status: ${{ status("my-step-alias") }}
+```
+
+### `semverParse(version)`
+
+The `semverParse()` function parses a semantic version string and returns a
+struct that provides access to its individual components through method calls.
+This is useful for scenarios where you need to inspect or manipulate specific
+version components, such as bumping the major, minor, or patch version.
+
+The returned struct provides the following methods:
+
+| Method | Return Type | Description |
+|--------|-------------|-------------|
+| `Major()` | `number` | Returns the major version component. |
+| `Minor()` | `number` | Returns the minor version component. |
+| `Patch()` | `number` | Returns the patch version component. |
+| `Prerelease()` | `string` | Returns the prerelease identifier (empty string if none). |
+| `Metadata()` | `string` | Returns the build metadata (empty string if none). |
+| `IncMajor()` | `Version` | Returns a new version with the major version incremented and minor/patch reset to 0. |
+| `IncMinor()` | `Version` | Returns a new version with the minor version incremented and patch reset to 0. |
+| `IncPatch()` | `Version` | Returns a new version with the patch version incremented. |
+| `String()` | `string` | Returns the full version string. |
+
+:::info
+The function uses the [Semantic Versioning](https://semver.org/) specification
+to parse versions. It supports versions with or without the `v` prefix, as well
+as prerelease and build metadata components.
+:::
+
+Example:
+
+```yaml
+# Read current chart version from Chart.yaml
+
+- uses: yaml-parse
+  as: read-version
+  config:
+    path: ./src/Chart.yaml
+    outputs:
+    - name: currentVersion
+      fromExpression: version
+
+# Update Chart.yaml with bumped minor version
+
+- uses: yaml-update
+  config:
+    path: ./src/Chart.yaml
+    updates:
+    - key: version
+      value: ${{ semverParse(task.outputs['read-version'].currentVersion).IncMinor().String() }}
 ```
 
 ### `semverDiff(version1, version2)`

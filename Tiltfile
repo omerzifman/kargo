@@ -68,12 +68,17 @@ k8s_yaml(
 # of the UI, so we're breaking it out into its own separate deployment here.
 k8s_yaml('hack/tilt/ui.yaml')
 
+# Setup a namespace and controller permissions for shared credentials.
+k8s_yaml('hack/tilt/shared-creds.yaml')
+
 k8s_resource(
   new_name = 'common',
   labels = ['kargo'],
   objects = [
     'kargo-admin:clusterrole',
     'kargo-admin:clusterrolebinding',
+    'kargo-admin:role',
+    'kargo-admin:rolebinding',
     'kargo-admin:serviceaccount',
     'kargo-project-admin:clusterrole',
     'kargo-project-creator:clusterrole',
@@ -133,7 +138,9 @@ k8s_resource(
     'kargo-controller-argocd:clusterrolebinding',
     'kargo-controller-read-secrets:clusterrole',
     'kargo-controller-rollouts:clusterrole',
-    'kargo-controller-rollouts:clusterrolebinding'
+    'kargo-controller-rollouts:clusterrolebinding',
+    'kargo-controller-read-secrets:rolebinding',
+    'kargo-shared-credentials:namespace'
   ],
   resource_deps=['back-end-compile', 'credential-helper-compile', ]
 )

@@ -18,6 +18,11 @@ export const useExtensionsContext = () => {
     projectSubpages:
       ctx?.extensions.filter((extension) => extension.type === 'projectSubpage') || [],
     appSubpages: ctx?.extensions.filter((extension) => extension.type === 'appSubpage') || [],
-    promoteTabs: ctx?.extensions.filter((extension) => extension.type === 'promoteTab') || []
+    promoteTabs: ctx?.extensions.filter((extension) => extension.type === 'promoteTab') || [],
+    settingsExtensions: ctx?.extensions.filter((extension) => extension.type === 'settings') || [],
+    projectSettingsExtensions:
+      ctx?.extensions.filter((extension) => extension.type === 'projectSettings') || [],
+    argoCDExtension:
+      ctx?.extensions.filter((extension) => extension.type === 'argocdExtension')[0] || null
   };
 };

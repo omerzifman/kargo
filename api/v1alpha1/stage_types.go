@@ -2,6 +2,7 @@ package v1alpha1
 
 import (
 	"crypto/sha1"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"slices"
@@ -312,6 +313,46 @@ type FreightSources struct {
 	//
 	// +kubebuilder:validation:Optional
 	AvailabilityStrategy FreightAvailabilityStrategy `json:"availabilityStrategy,omitempty" protobuf:"bytes,4,opt,name=availabilityStrategy"`
+	// AutoPromotionOptions specifies options pertaining to auto-promotion. These
+	// settings have no effect if auto-promotion is not enabled for this Stage at
+	// the ProjectConfig level.
+	AutoPromotionOptions *AutoPromotionOptions `json:"autoPromotionOptions,omitempty" protobuf:"bytes,5,opt,name=autoPromotionOptions"`
+}
+
+// AutoPromotionSelectionPolicy specifies the rules for identifying new Freight
+// that is eligible for auto-promotion to this Stage.
+//
+// +kubebuilder:validation:Enum={NewestFreight,MatchUpstream}
+type AutoPromotionSelectionPolicy string
+
+const (
+	// AutoPromotionSelectionPolicyNewestFreight represents an auto-promotion
+	// selection policy in which the newest Freight that is available to the Stage
+	// is eligible for auto-promotion.
+	AutoPromotionSelectionPolicyNewestFreight AutoPromotionSelectionPolicy = "NewestFreight"
+	// AutoPromotionSelectionPolicyMatchUpstream represents an auto-promotion
+	// selection policy in which only the Freight currently used immediately
+	// upstream from this Stage is eligible for auto-promotion. This policy may
+	// only be applied when the Stage has exactly one upstream Stage.
+	AutoPromotionSelectionPolicyMatchUpstream AutoPromotionSelectionPolicy = "MatchUpstream"
+)
+
+// AutoPromotionOptions specifies options pertaining to auto-promotion.
+type AutoPromotionOptions struct {
+	// SelectionPolicy specifies the rules for identifying new Freight that is
+	// eligible for auto-promotion to this Stage. This field is optional. When
+	// left unspecified, the field is implicitly treated as if its value were
+	// "NewestFreight".
+	//
+	// Accepted Values:
+	//
+	// - "NewestFreight": The newest Freight that is available to the Stage is
+	//   eligible for auto-promotion.
+	//
+	// - "MatchUpstream": Only the Freight currently used immediately upstream
+	//   from this Stage is eligible for auto-promotion. This policy may only
+	//   be applied when the Stage has exactly one upstream Stage.
+	SelectionPolicy AutoPromotionSelectionPolicy `json:"selectionPolicy,omitempty" protobuf:"bytes,1,opt,name=selectionPolicy"`
 }
 
 // PromotionTemplate defines a template for a Promotion that can be used to
@@ -381,6 +422,10 @@ type StageStatus struct {
 	// AutoPromotionEnabled indicates whether automatic promotion is enabled
 	// for the Stage based on the ProjectConfig.
 	AutoPromotionEnabled bool `json:"autoPromotionEnabled,omitempty" protobuf:"varint,14,opt,name=autoPromotionEnabled"`
+	// Metadata is a map of arbitrary metadata associated with the Stage.
+	// This is useful for storing additional information about the Stage
+	// that can be shared across promotions, verifications, or other processes.
+	Metadata map[string]apiextensionsv1.JSON `json:"metadata,omitempty" protobuf:"bytes,15,rep,name=metadata" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 }
 
 // GetConditions implements the conditions.Getter interface.
@@ -391,6 +436,40 @@ func (w *StageStatus) GetConditions() []metav1.Condition {
 // SetConditions implements the conditions.Setter interface.
 func (w *StageStatus) SetConditions(conditions []metav1.Condition) {
 	w.Conditions = conditions
+}
+
+// UpsertMetadata inserts or updates the given key in Stage status Metadata
+func (s *StageStatus) UpsertMetadata(key string, data any) error {
+	if len(s.Metadata) == 0 {
+		s.Metadata = make(map[string]apiextensionsv1.JSON)
+	}
+
+	if key == "" {
+		return fmt.Errorf("key must not be empty")
+	}
+
+	dataBytes, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	s.Metadata[key] = apiextensionsv1.JSON{
+		Raw: dataBytes,
+	}
+	return nil
+}
+
+// GetMetadata retrieves the data associated with the given key from Stage status Metadata
+func (s *StageStatus) GetMetadata(key string, data any) (bool, error) {
+	dataBytes, ok := s.Metadata[key]
+
+	if !ok {
+		return false, nil
+	}
+
+	if err := json.Unmarshal(dataBytes.Raw, data); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // FreightReference is a simplified representation of a piece of Freight -- not

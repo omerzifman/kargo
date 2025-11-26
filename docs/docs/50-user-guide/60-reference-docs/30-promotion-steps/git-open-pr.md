@@ -24,7 +24,7 @@ GitLab pull/merge requests.
 | `targetBranch` | `string` | N | The branch to which the changes should be merged. |
 | `createTargetBranch` | `boolean` | N | Indicates whether a new, empty orphaned branch should be created and pushed to the remote if the target branch does not already exist there. Default is `false`. |
 | `title` | `string` | N | The title for the pull request. Kargo generates a title based on the commit messages if it is not explicitly specified. |
-| `description` | `string` | N | The description for the pull request. Kargo generates a title based on the commit messages if it is not explicitly specified. |
+| `description` | `string` | N | The description for the pull request. |
 | `labels` | `[]string` | N | Labels to add to the pull request. |
 
 ## Output
@@ -96,21 +96,4 @@ steps:
     title: Deploy to ${{ ctx.stage }}
     labels: ["infra", "needs-review"]
 # Wait for the PR to be merged or closed...
-```
-
-### Custom Git Provider
-
-The following example demonstrates how to specify a custom Git provider for
-`git-open-pr`. This is useful when the provider cannot be inferred from the
-`repoURL`. For example, if the repository is hosted on a self-hosted GitLab
-instance, the provider must be specified as `gitlab`.
-
-```yaml
-steps:
-# Clone, push, prepare the contents of ./out, commit, etc...
-- uses: git-open-pr
-  config:
-    repoURL: https://gitlab.example.com/example/repo.git
-    provider: gitlab
-    # Additional configuration...
 ```
