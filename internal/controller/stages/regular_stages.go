@@ -387,7 +387,7 @@ func (r *RegularStageReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{RequeueAfter: 100 * time.Millisecond}, nil
 	}
 	// Otherwise, requeue after a delay.
-	return controller.ResultWithRequeue(r.cfg.ReconciliationInterval, 5*time.Minute), nil
+	return controller.ResultWithRequeue(r.cfg.ReconciliationInterval), nil
 }
 
 func (r *RegularStageReconciler) reconcile(

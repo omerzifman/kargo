@@ -443,6 +443,60 @@ controller:
       minReconciliationInterval: 15m
 ```
 
+### Tuning Stage Reconciliation Intervals
+
+By default, `Stage` resources are reconciled periodically every 5 minutes when
+no immediate action is required. This ensures that Stages stay in sync with
+their desired state and detect changes that may require promotion or health
+checks.
+
+You may wish to adjust this interval based on your needs:
+
+- **Increase the interval** (e.g., to 10-15 minutes) if you have many Stages
+  and want to reduce controller load, accepting that state changes may take
+  longer to be reflected.
+- **Decrease the interval** (e.g., to 1-2 minutes) if you need faster detection
+  of state changes and your cluster can handle the increased reconciliation
+  frequency.
+
+```yaml
+controller:
+  reconcilers:
+    stages:
+      reconciliationInterval: 10m
+```
+
+:::note
+This setting affects the periodic reconciliation interval for regular Stages.
+Immediate reconciliations (triggered by resource changes or explicit requeues)
+are not affected by this setting.
+:::
+
+### Tuning Management Resource Reconciliation Intervals
+
+Similar to Stages, management resources (`Project`, `ProjectConfig`, and
+`ClusterConfig`) are also reconciled periodically every 5 minutes by default
+when no immediate action is required.
+
+You can adjust these intervals independently for each resource type:
+
+```yaml
+managementController:
+  reconcilers:
+    projects:
+      reconciliationInterval: 10m
+    projectConfigs:
+      reconciliationInterval: 10m
+    clusterConfigs:
+      reconciliationInterval: 10m
+```
+
+:::note
+Management resources typically change less frequently than operational resources
+like Stages or Warehouses, so you may want to use a longer interval to reduce
+unnecessary reconciliation overhead.
+:::
+
 ### Tuning Concurrent Reconciliation Limits
 
 By default, Kargo will reconcile up to four resources of the same kind

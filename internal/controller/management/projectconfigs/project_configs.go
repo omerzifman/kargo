@@ -137,8 +137,8 @@ func (r *reconciler) Reconcile(
 		return ctrl.Result{}, reconcileErr
 	}
 
-	// Requeue after a delay using configured interval or 5m default.
-	return controller.ResultWithRequeue(r.cfg.ReconciliationInterval, 5*time.Minute), nil
+	// Otherwise, requeue after a delay
+	return controller.ResultWithRequeue(r.cfg.ReconciliationInterval), nil
 }
 
 func (r *reconciler) reconcile(
